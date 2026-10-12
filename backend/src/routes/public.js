@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { snapToGrid, haversine } from '../geo.js';
 import { publicLayers } from '../layers.js';
 import { computeZones, publicZone } from '../ai/zones.js';
+import { rateLimit } from '../ratelimit.js';
 import { createWallet, authenticateWallet, requestWithdrawal, HttpError } from '../services/points.js';
 import { createReport, stripReportForOwner, STATUS_LABELS } from '../services/workflow.js';
 
@@ -93,7 +94,7 @@ publicRouter.get('/public/area', wrap((req, res) => {
 }));
 
 // ---- portefeuille pseudonyme --------------------------------------------------------------------
-publicRouter.post('/wallets', (_req, res) => res.status(201).json(createWallet()));
+publicRouter.post('/wallets', rateLimit({ name: 'wallets', max: config.rateLimit.walletsPerHour }), (_req, res) => res.status(201).json(createWallet()));
 
 function walletView(w) {
   const ledger = db.prepare('SELECT delta, reason, at FROM ledger WHERE wallet_id = ? ORDER BY id DESC LIMIT 100').all(w.id);
@@ -133,7 +134,7 @@ publicRouter.post('/wallet/withdrawals', wrap((req, res) => {
 }));
 
 // ---- signalement ---------------------------------------------------------------------------------
-publicRouter.post('/reports', upload.fields([{ name: 'photo', maxCount: 1 }, { name: 'audio', maxCount: 1 }]), wrap((req, res) => {
+publicRouter.post('/reports', rateLimit({ name: 'reports', max: config.rateLimit.reportsPerHour }), upload.fields([{ name: 'photo', maxCount: 1 }, { name: 'audio', maxCount: 1 }]), wrap((req, res) => {
   const wallet = authenticateWallet(req.get('authorization'));
   const photo = req.files?.photo?.[0];
   const audio = req.files?.audio?.[0];

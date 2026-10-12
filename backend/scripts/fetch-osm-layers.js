@@ -17,27 +17,81 @@ const query = `[out:json][timeout:60];
   way["leisure"="nature_reserve"](${b});
   way["landuse"="forest"]["name"](${b});
   way["waterway"="river"](${b});
+  relation["boundary"="protected_area"](${b});
+  relation["leisure"="nature_reserve"](${b});
+  relation["landuse"="forest"]["name"](${b});
 );
 out geom;`;
 
-const res = await fetch('https://overpass-api.de/api/interpreter', {
-  method: 'POST',
-  body: new URLSearchParams({ data: query }),
-  headers: { 'User-Agent': 'GoldWatchCI-hackathon/0.1' },
-});
-if (!res.ok) throw new Error(`Overpass ${res.status}`);
-const { elements } = await res.json();
+// Overpass est un service communautaire souvent saturé (504) : plusieurs miroirs et nouvelles tentatives.
+const MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
+let elements;
+for (let attempt = 0; attempt < 3 && !elements; attempt++) {
+  for (const url of MIRRORS) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        body: new URLSearchParams({ data: query }),
+        headers: { 'User-Agent': 'GoldWatchCI-hackathon/0.1' },
+        signal: AbortSignal.timeout(90000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      ({ elements } = await res.json());
+      console.log(`Réponse de ${url}`);
+      break;
+    } catch (e) {
+      console.warn(`${url} : ${e.message}`);
+    }
+  }
+  if (!elements) await new Promise((r) => setTimeout(r, 5000));
+}
+if (!elements) throw new Error('Overpass injoignable ou saturé : réessayez plus tard (ou avec une zone plus petite)');
+
+/** Assemble des segments (ways) en anneaux fermés en les raccordant bout à bout. */
+function stitchRings(segments) {
+  const segs = segments.map((s) => s.slice());
+  const rings = [];
+  const same = (p, q) => p[0] === q[0] && p[1] === q[1];
+  while (segs.length) {
+    let ring = segs.shift();
+    let grown = true;
+    while (grown && !same(ring[0], ring.at(-1))) {
+      grown = false;
+      for (let i = 0; i < segs.length; i++) {
+        const sg = segs[i];
+        if (same(ring.at(-1), sg[0])) ring = ring.concat(sg.slice(1));
+        else if (same(ring.at(-1), sg.at(-1))) ring = ring.concat(sg.slice(0, -1).reverse());
+        else continue;
+        segs.splice(i, 1);
+        grown = true;
+        break;
+      }
+    }
+    if (ring.length >= 4 && same(ring[0], ring.at(-1))) rings.push(ring);
+  }
+  return rings;
+}
 
 const features = [];
+const nameOf = (t = {}) => t.name || t['name:fr'] || '(sans nom)';
 for (const el of elements) {
-  if (!el.geometry || el.geometry.length < 2) continue;
-  const coords = el.geometry.map((p) => [p.lon, p.lat]);
-  const name = el.tags?.name || el.tags?.['name:fr'] || '(sans nom)';
-  if (el.tags?.waterway) {
-    features.push({ type: 'Feature', properties: { kind: 'river', name, osm: el.id }, geometry: { type: 'LineString', coordinates: coords } });
-  } else if (coords.length >= 4) {
-    const ring = coords[0].join() === coords.at(-1).join() ? coords : [...coords, coords[0]];
-    features.push({ type: 'Feature', properties: { kind: 'protected', name, osm: el.id }, geometry: { type: 'Polygon', coordinates: [ring] } });
+  const tags = el.tags || {};
+  if (el.type === 'way' && el.geometry?.length >= 2) {
+    const coords = el.geometry.map((p) => [p.lon, p.lat]);
+    if (tags.waterway) {
+      features.push({ type: 'Feature', properties: { kind: 'river', name: nameOf(tags), osm: el.id }, geometry: { type: 'LineString', coordinates: coords } });
+    } else if (coords.length >= 4 && coords[0].join() === coords.at(-1).join()) {
+      features.push({ type: 'Feature', properties: { kind: 'protected', name: nameOf(tags), osm: el.id }, geometry: { type: 'Polygon', coordinates: [coords] } });
+    }
+  } else if (el.type === 'relation') {
+    const outers = (el.members || []).filter((m) => m.role === 'outer' && m.geometry?.length >= 2).map((m) => m.geometry.map((p) => [p.lon, p.lat]));
+    for (const ring of stitchRings(outers)) {
+      features.push({ type: 'Feature', properties: { kind: 'protected', name: nameOf(tags), osm: el.id }, geometry: { type: 'Polygon', coordinates: [ring] } });
+    }
   }
 }
 

@@ -3,7 +3,9 @@ import path from 'node:path';
 import { config } from './config.js';
 import { distanceToLine, distanceToRing, haversine } from './geo.js';
 
-const file = process.env.LAYERS_FILE || path.join(config.dataDir, 'layers.geojson');
+// Couches réelles OpenStreetMap si présentes (npm run layers:osm), sinon couches de démonstration fictives.
+const osmFile = path.join(config.dataDir, 'layers.osm.geojson');
+const file = process.env.LAYERS_FILE || (fs.existsSync(osmFile) ? osmFile : path.join(config.dataDir, 'layers.geojson'));
 const fc = JSON.parse(fs.readFileSync(file, 'utf8'));
 
 const byKind = (k) => fc.features.filter((f) => f.properties.kind === k);

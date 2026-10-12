@@ -131,7 +131,20 @@ CREATE TABLE IF NOT EXISTS fund (
   balance_fcfa INTEGER NOT NULL
 );
 INSERT OR IGNORE INTO fund(id, balance_fcfa) VALUES (1, 1000000);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  authority_id TEXT NOT NULL REFERENCES authorities(id),
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS login_attempts (
+  authority_id TEXT PRIMARY KEY,
+  failures INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT
+);
 `);
+// migration : mot de passe haché (scrypt) pour les bases créées avant l'authentification par session
+try { db.exec('ALTER TABLE authorities ADD COLUMN password_hash TEXT'); } catch { /* colonne déjà présente */ }
 
 export const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 export const newId = (prefix) => `${prefix}_${crypto.randomBytes(8).toString('hex')}`;

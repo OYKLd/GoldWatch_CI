@@ -34,7 +34,7 @@ export function seed() {
   const wal = (i) => db.prepare('SELECT * FROM wallets WHERE id = ?').get(wallets[i].walletId);
 
   // Scénario 1 — Hiré : 12 signalements d'orpaillage/pollution en ~5 semaines, 6 déclarants, près d'un cours d'eau et d'une forêt classée
-  const hire = [5.735, -5.31];
+  const hire = [5.708, -5.325]; // à proximité d'un affluent réel (OSM) pour la démo
   const descr = [
     'Eau de la rivière devenue jaune et boueuse, poissons morts en aval',
     'Des hommes avec une motopompe et des tamis au bord du cours d\'eau',

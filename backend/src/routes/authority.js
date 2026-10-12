@@ -4,7 +4,8 @@ import { Router } from 'express';
 import { db, exactLocation } from '../db.js';
 import { config } from '../config.js';
 import { computeZones } from '../ai/zones.js';
-import { authenticateAuthority, requireRole, logAccess } from '../services/authorities.js';
+import { authenticateAuthority, requireRole, logAccess, login, logout, changePassword } from '../services/authorities.js';
+import { rateLimit } from '../ratelimit.js';
 import {
   HttpError, verifyLedger, approveWithdrawal, rejectWithdrawal, runDuePayments, expireInactivePoints,
 } from '../services/points.js';
@@ -13,6 +14,13 @@ import {
 } from '../services/workflow.js';
 
 export const authorityRouter = Router();
+
+const wrapOpen = (fn) => (req, res, next) => { try { fn(req, res, next); } catch (e) { next(e); } };
+
+// Routes sans session : connexion (limitée en débit, verrouillage du compte après échecs répétés).
+authorityRouter.post('/login',
+  rateLimit({ name: 'login', max: config.rateLimit.loginPerHour }),
+  wrapOpen((req, res) => res.json(login(req.body?.id, req.body?.password))));
 
 authorityRouter.use((req, _res, next) => {
   try { req.authority = authenticateAuthority(req); next(); } catch (e) { next(e); }
@@ -23,6 +31,14 @@ const VERIFIER = ['agent'];
 const READER = ['agent', 'analyste', 'gestionnaire_fonds'];
 
 authorityRouter.get('/me', (req, res) => res.json(req.authority));
+
+authorityRouter.post('/logout', (req, res) => { logout(req); res.json({ ok: true }); });
+
+authorityRouter.post('/password', wrap((req, res) => {
+  changePassword(req.authority.id, req.body?.current, req.body?.next);
+  logAccess(req.authority, 'password_change');
+  res.json({ ok: true, message: 'Mot de passe modifié : reconnectez-vous.' });
+}));
 
 authorityRouter.get('/alerts', wrap((req, res) => {
   requireRole(req.authority, ...READER);

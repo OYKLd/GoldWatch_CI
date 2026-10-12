@@ -1,7 +1,7 @@
 /* Dashboard autorités GoldWatch CI — JS sans dépendance (hors Leaflet). La clé d'accès reste en sessionStorage. */
 const API = location.origin + '/api/authority';
-let KEY = '';
-try { KEY = sessionStorage.getItem('gw_key') || ''; } catch { /* stockage indisponible */ }
+let TOKEN = '';
+try { TOKEN = sessionStorage.getItem('gw_token') || ''; } catch { /* stockage indisponible */ }
 let ME = null;
 let map, layerGroup;
 const $ = (s) => document.querySelector(s);
@@ -11,31 +11,46 @@ const fmt = (d) => new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', tim
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {
     ...opts,
-    headers: { 'x-api-key': KEY, ...(opts.body ? { 'content-type': 'application/json' } : {}) },
+    headers: { Authorization: `Bearer ${TOKEN}`, ...(opts.body ? { 'content-type': 'application/json' } : {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && TOKEN) { endSession(); throw new Error('Session expirée : reconnectez-vous'); }
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
+}
+function endSession() {
+  TOKEN = '';
+  try { sessionStorage.removeItem('gw_token'); } catch { /* ignoré */ }
+  $('#login').hidden = false; $('#app').hidden = true; $('#tabs').hidden = true; $('#logoutBtn').hidden = true; $('#who').textContent = '';
 }
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; setTimeout(() => (t.hidden = true), 3200); }
 
 async function login() {
   try {
     ME = await api('/me');
-    try { sessionStorage.setItem('gw_key', KEY); } catch { /* ignoré */ }
+    $('#logoutBtn').hidden = false;
     $('#login').hidden = true; $('#app').hidden = false; $('#tabs').hidden = false;
     $('#who').textContent = `${ME.name} — ${ME.organisation} (${ME.roleLabel})`;
     document.querySelectorAll('nav [data-role]').forEach((b) => { if (ME.role !== 'admin' && b.dataset.role !== ME.role) b.hidden = true; });
     show('alerts');
   } catch (e) {
     $('#loginErr').textContent = e.message;
-    try { sessionStorage.removeItem('gw_key'); } catch { /* ignoré */ }
   }
 }
-$('#loginBtn').onclick = () => { KEY = $('#key').value.trim(); login(); };
-$('#key').addEventListener('keydown', (e) => e.key === 'Enter' && $('#loginBtn').click());
-if (KEY) login();
+$('#loginBtn').onclick = async () => {
+  $('#loginErr').textContent = '';
+  try {
+    const r = await api('/login', { method: 'POST', body: { id: $('#ident').value.trim(), password: $('#pwd').value } });
+    TOKEN = r.token;
+    $('#pwd').value = '';
+    try { sessionStorage.setItem('gw_token', TOKEN); } catch { /* ignoré */ }
+    login();
+  } catch (e) { $('#loginErr').textContent = e.message; }
+};
+$('#pwd').addEventListener('keydown', (e) => e.key === 'Enter' && $('#loginBtn').click());
+$('#logoutBtn').onclick = async () => { try { await api('/logout', { method: 'POST' }); } catch { /* ignoré */ } endSession(); };
+if (TOKEN) login();
 
 document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => show(b.dataset.tab)));
 function show(tab) {
@@ -120,7 +135,7 @@ async function openCase(id) {
     <h3>Historique</h3><ul>${c.history.map((h) => `<li>${fmt(h.at)} — ${esc(h.fromStatus || '∅')} → <b>${esc(h.toStatus)}</b> (${esc(h.actor)})</li>`).join('')}</ul>`;
   // médias chargés avec la clé d'accès (en-tête) puis exposés en blob
   box.querySelectorAll('[data-src]').forEach(async (el) => {
-    const r = await fetch(location.origin + el.dataset.src, { headers: { 'x-api-key': KEY } });
+    const r = await fetch(location.origin + el.dataset.src, { headers: { Authorization: `Bearer ${TOKEN}` } });
     if (r.ok) el.src = URL.createObjectURL(await r.blob());
   });
   box.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => act(c.id, b.dataset.act)));

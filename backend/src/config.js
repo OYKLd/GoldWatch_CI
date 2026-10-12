@@ -71,6 +71,18 @@ export const config = {
   },
   // Côte d'Ivoire (boîte englobante) : refuse les positions manifestement fantaisistes
   bounds: { minLat: 4.3, maxLat: 10.8, minLng: -8.7, maxLng: -2.4 },
+  auth: {
+    sessionHours: num(process.env.SESSION_HOURS, 8),
+    maxFailures: num(process.env.LOGIN_MAX_FAILURES, 5),
+    lockMinutes: num(process.env.LOGIN_LOCK_MINUTES, 15),
+    minPasswordLength: 10,
+  },
+  // limites en mémoire par adresse (jamais écrites sur disque) : freinent la création en masse de portefeuilles
+  rateLimit: {
+    walletsPerHour: num(process.env.RATE_WALLETS_PER_HOUR, 20),
+    reportsPerHour: num(process.env.RATE_REPORTS_PER_HOUR, 60),
+    loginPerHour: num(process.env.RATE_LOGIN_PER_HOUR, 60),
+  },
   maxPhotoBytes: 8 * 1024 * 1024,
   maxAudioBytes: 5 * 1024 * 1024,
 };
