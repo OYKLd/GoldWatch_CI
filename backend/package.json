@@ -1,0 +1,19 @@
+{
+  "name": "goldwatch-ci-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "API GoldWatch CI : signalements anonymisés, Citizen AI, canal autorités, récompenses pseudonymes",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/seed.js",
+    "test": "node --no-warnings --test \"test/*.test.js\"",
+    "layers:osm": "node scripts/fetch-osm-layers.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "multer": "^2.0.2"
+  }
+}

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoldWatch CI — Dashboard autorités</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="pin"></span> GoldWatch CI <small>Canal sécurisé — autorités compétentes</small></div>
+    <nav id="tabs" hidden>
+      <button data-tab="alerts" class="on">Alertes</button>
+      <button data-tab="cases">Dossiers</button>
+      <button data-tab="stats">Statistiques</button>
+      <button data-tab="fund" data-role="gestionnaire_fonds">Fonds</button>
+      <button data-tab="audit" data-role="admin">Audit</button>
+    </nav>
+    <div id="who"></div>
+  </header>
+
+  <section id="login" class="card narrow">
+    <h2>Accès autorités</h2>
+    <p>Saisissez la clé d'accès personnelle fournie par l'administrateur. Chaque consultation d'une position exacte est journalisée.</p>
+    <input id="key" type="password" placeholder="Clé d'accès" autocomplete="off">
+    <button id="loginBtn" class="primary">Se connecter</button>
+    <p id="loginErr" class="err"></p>
+  </section>
+
+  <main id="app" hidden>
+    <div id="tab-alerts">
+      <div class="split">
+        <div id="map"></div>
+        <div id="alertList" class="list"></div>
+      </div>
+    </div>
+    <div id="tab-cases" hidden>
+      <div class="split">
+        <div class="list">
+          <div class="filters">
+            <select id="caseFilter">
+              <option value="">Tous</option><option value="transmis">Transmis</option><option value="en_verification">En vérification</option>
+              <option value="fonde">Fondé</option><option value="traite">Traité</option><option value="cloture">Clôturé</option>
+            </select>
+          </div>
+          <div id="caseList"></div>
+        </div>
+        <div id="caseDetail" class="card">Sélectionnez un dossier.</div>
+      </div>
+    </div>
+    <div id="tab-stats" hidden><div id="statsBox" class="grid"></div></div>
+    <div id="tab-fund" hidden><div id="fundBox"></div></div>
+    <div id="tab-audit" hidden><div id="auditBox"></div></div>
+  </main>
+
+  <div id="toast" hidden></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
