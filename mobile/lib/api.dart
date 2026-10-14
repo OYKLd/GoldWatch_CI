@@ -15,6 +15,14 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Accepte `192.168.1.82:3000`, `http://192.168.1.82:3000/` ou `…/api` : ajoute http:// et retire espaces et `/`.
+String normalizeBaseUrl(String raw) {
+  var u = raw.trim().replaceAll(RegExp(r'\s+'), '');
+  if (u.isEmpty) return defaultBaseUrl();
+  if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(u)) u = 'http://$u';
+  return u.replaceAll(RegExp(r'/+$'), '').replaceFirst(RegExp(r'/api$'), '');
+}
+
 String defaultBaseUrl() {
   const fromEnv = String.fromEnvironment('API_URL');
   if (fromEnv.isNotEmpty) return fromEnv;
@@ -48,8 +56,12 @@ class Api {
       res = await call().timeout(const Duration(seconds: 20));
     } on TimeoutException {
       throw ApiException('Le serveur ne répond pas', network: true);
-    } catch (_) {
-      throw ApiException('Réseau indisponible', network: true);
+    } catch (e) {
+      final detail = e.toString().replaceAll(RegExp(r'\s+'), ' ');
+      throw ApiException(
+        'Réseau indisponible (${detail.length > 110 ? '${detail.substring(0, 110)}…' : detail})',
+        network: true,
+      );
     }
     dynamic body;
     try {
@@ -75,6 +87,7 @@ class Api {
         return http.Response.fromStream(await req.send());
       });
 
+  Future<void> health() async => _get('/health');
   Future<Map<String, dynamic>> config() async => Map<String, dynamic>.from(await _get('/config'));
   Future<Map<String, dynamic>> createWallet() async => Map<String, dynamic>.from(await _json('POST', '/wallets', {}));
   Future<Map<String, dynamic>> layers() async => Map<String, dynamic>.from(await _get('/layers'));

@@ -288,15 +288,46 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _settings() async {
     final ctrl = TextEditingController(text: widget.session.baseUrl);
-    final ok = await showDialog<bool>(
+    String? result;
+    bool? ok;
+    ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Serveur GoldWatch'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'URL de l\'API')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Enregistrer')),
-        ],
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSt) => AlertDialog(
+          title: const Text('Serveur GoldWatch'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Adresse du serveur',
+                hintText: 'http://192.168.1.82:3000',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('Téléphone et PC doivent être sur le même Wi-Fi. Émulateur : http://10.0.2.2:3000',
+                style: TextStyle(fontSize: 12)),
+            if (result != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(result!)),
+          ]),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final url = normalizeBaseUrl(ctrl.text);
+                setSt(() => result = 'Test de $url …');
+                try {
+                  await Api(url).health();
+                  setSt(() => result = '✓ Serveur joignable ($url)');
+                } on ApiException catch (e) {
+                  setSt(() => result = '✗ ${e.message}');
+                }
+              },
+              child: const Text('Tester'),
+            ),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Enregistrer')),
+          ],
+        ),
       ),
     );
     if (ok == true) {

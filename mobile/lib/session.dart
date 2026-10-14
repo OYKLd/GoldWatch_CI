@@ -18,7 +18,7 @@ class Session extends ChangeNotifier {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
-    api = Api(_prefs.getString('baseUrl') ?? defaultBaseUrl());
+    api = Api(normalizeBaseUrl(_prefs.getString('baseUrl') ?? defaultBaseUrl()));
     walletId = _prefs.getString('walletId');
     recoveryCode = _prefs.getString('recoveryCode');
     discreet = _prefs.getBool('discreet') ?? false;
@@ -33,7 +33,7 @@ class Session extends ChangeNotifier {
 
   String get baseUrl => api.baseUrl;
   Future<void> setBaseUrl(String url) async {
-    api.baseUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
+    api.baseUrl = normalizeBaseUrl(url);
     await _prefs.setString('baseUrl', api.baseUrl);
     notifyListeners();
   }
