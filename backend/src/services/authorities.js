@@ -76,7 +76,9 @@ export function login(authorityId, password) {
   if (att?.locked_until && new Date(att.locked_until) > now) {
     throw new HttpError(429, `Compte verrouillé après trop d'échecs. Réessayez dans ${config.auth.lockMinutes} minutes.`, 'locked');
   }
-  const a = db.prepare('SELECT * FROM authorities WHERE id = ?').get(String(authorityId || ''));
+  // l'identifiant technique (a_admin) ou le nom affiché (Administrateur), sans tenir compte de la casse
+  const ident = String(authorityId || '').trim();
+  const a = db.prepare('SELECT * FROM authorities WHERE lower(id) = lower(?) OR lower(name) = lower(?)').get(ident, ident);
   // même temps de calcul et même message que le compte existe ou non
   const ok = verifyPassword(String(password || ''), a?.password_hash ?? 'aa:bb');
   if (!a || !ok) {
@@ -88,7 +90,7 @@ export function login(authorityId, password) {
     ).run(String(authorityId || ''), lock ? 0 : failures, lock);
     throw new HttpError(401, 'Identifiant ou mot de passe invalide', 'bad_credentials');
   }
-  db.prepare('DELETE FROM login_attempts WHERE authority_id = ?').run(a.id);
+  db.prepare('DELETE FROM login_attempts WHERE authority_id = ?').run(authorityId);
   db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(nowIso());
   const token = crypto.randomBytes(32).toString('base64url');
   const expires = new Date(now.getTime() + config.auth.sessionHours * 3600000).toISOString();

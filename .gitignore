@@ -8,3 +8,4 @@ backend/data/credentials.json
 .dart_tool/
 build/
 *.log
+dist/
